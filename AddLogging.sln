@@ -9,14 +9,18 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProgramaTeste", "ProgramaTe
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug_NLog_LT_4.3.11|Any CPU = Debug_NLog_LT_4.3.11|Any CPU
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{887CF685-DB27-44A9-AFB1-5196BFD09383}.Debug_NLog_LT_4.3.11|Any CPU.ActiveCfg = Debug_NLog_LT_4.3.11|Any CPU
+		{887CF685-DB27-44A9-AFB1-5196BFD09383}.Debug_NLog_LT_4.3.11|Any CPU.Build.0 = Debug_NLog_LT_4.3.11|Any CPU
 		{887CF685-DB27-44A9-AFB1-5196BFD09383}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{887CF685-DB27-44A9-AFB1-5196BFD09383}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{887CF685-DB27-44A9-AFB1-5196BFD09383}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{887CF685-DB27-44A9-AFB1-5196BFD09383}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BF7A956A-881A-4F27-8D1C-3650AEA65F2F}.Debug_NLog_LT_4.3.11|Any CPU.ActiveCfg = Release|Any CPU
 		{BF7A956A-881A-4F27-8D1C-3650AEA65F2F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BF7A956A-881A-4F27-8D1C-3650AEA65F2F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BF7A956A-881A-4F27-8D1C-3650AEA65F2F}.Release|Any CPU.ActiveCfg = Release|Any CPU

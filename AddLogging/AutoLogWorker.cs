@@ -43,16 +43,8 @@ namespace AutoLog
         private static void ProcessModule(ModuleDefinition module)
         {
             logger.Info($"Processing Module '{module.Name}'");
-            var logManager = module.Import(typeof(NLog.LogManager)).Resolve();
-            var ilogger = module.Import(typeof(NLog.ILogger)).Resolve();
 
-            var getCurrentClassLogger = logManager.Methods.Single(x => x.Name == "GetCurrentClassLogger" && !x.HasParameters);
-            var logerror = ilogger.Methods.Single(x => x.Name == "Error" && x.Parameters.Count == 2 && x.Parameters[0].ParameterType.Name == "Exception" && x.Parameters[1].ParameterType.Name == "String");
-
-            var refIlogger = module.Import(ilogger);
-            var refGetCurrentClassLogger = module.Import(getCurrentClassLogger);
-            var refLogError = module.Import(logerror);
-            var refException = module.Import(typeof(Exception));
+            var refs = new ModuleReferences(module);
 
             // ------------------------------------------------------
             logger.Info($"Processing Module '{module.Name}'");
@@ -60,32 +52,32 @@ namespace AutoLog
             {
                 logger.Info($"Processing Type '{type.Name}'");
 
-                var loggerField = AddStaticLoggerField(type, refIlogger, refGetCurrentClassLogger);
+                var loggerField = AddStaticLoggerField(type, refs);
                 foreach (var method in type.Methods.Where(x => x.Name == "refreshPlugins"))
                 {
                     logger.Info($"Processing Method '{method.Name}'");
                     if (method.Body == null)
                         continue;
-                    //AddCatchLogger(refLogError, refException, loggerField, method, method.Body);
+                    AddCatchLogger(loggerField, method, method.Body, refs);
                 }
             }
 
         }
 
-        private static void AddCatchLogger(MethodReference refLogError, TypeReference refException, FieldDefinition loggerField, MethodDefinition method, MethodBody body)
+        private static void AddCatchLogger(FieldDefinition loggerField, MethodDefinition method, MethodBody body, ModuleReferences refs)
         {
             foreach (var exh in body.ExceptionHandlers.Where(x => x.HandlerType == ExceptionHandlerType.Catch))
             {
                 var hstart = exh.HandlerStart;
-                if (exh.CatchType.FullName == "System.Object")
-                    exh.CatchType = refException;
+                if (exh.CatchType.FullName == typeof(object).FullName)
+                    exh.CatchType = refs.Exception;
 
                 var il = body.GetILProcessor();
                 int slot = 0;
                 if (hstart.OpCode == OpCodes.Pop)
                 {
                     slot = method.Body.Variables.Count();
-                    method.Body.Variables.Add(new VariableDefinition(refException));
+                    method.Body.Variables.Add(new VariableDefinition(refs.Exception));
                     var newhstart = InstructionHelper.CreateStloc(method, slot);
                     il.Replace(hstart, newhstart);
                     hstart = newhstart;
@@ -98,20 +90,24 @@ namespace AutoLog
                 }
 
                 il.InjectAfter(hstart,
-                     Instruction.Create(OpCodes.Ldsfld, loggerField),
-                     InstructionHelper.CreateLdloc(method, slot),
-                     Instruction.Create(OpCodes.Ldstr, "AUTOLOG EXCEPTION"),
-                     Instruction.Create(OpCodes.Callvirt, refLogError));
+                    Instruction.Create(OpCodes.Ldsfld, loggerField),
+                    InstructionHelper.CreateLdloc(method, slot),
+                    Instruction.Create(OpCodes.Ldstr, "AUTOLOG EXCEPTION"),
+#if NLOG_LT_4311
+                    Instruction.Create(OpCodes.Ldc_I4_0),
+                    Instruction.Create(OpCodes.Newarr, refs.Object),
+#endif
+                Instruction.Create(OpCodes.Callvirt, refs.LogError));
 
             }
         }
-        private static FieldDefinition AddStaticLoggerField(TypeDefinition type, TypeReference refILogger, MethodReference refGetCurrentClassLogger)
+        private static FieldDefinition AddStaticLoggerField(TypeDefinition type, ModuleReferences refs)
         {
-            var loggerField = new FieldDefinition(DetermineLoggerFieldName(type), FieldAttributes.Private | FieldAttributes.Static | FieldAttributes.InitOnly, refILogger);
+            var loggerField = new FieldDefinition(DetermineLoggerFieldName(type), FieldAttributes.Private | FieldAttributes.Static | FieldAttributes.InitOnly, refs.Ilogger);
             type.Fields.Add(loggerField);
 
             var initr = new[] {
-                Instruction.Create(OpCodes.Call, refGetCurrentClassLogger),
+                Instruction.Create(OpCodes.Call, refs.GetCurrentClassLogger),
                 Instruction.Create(OpCodes.Stsfld, loggerField),
             };
 
