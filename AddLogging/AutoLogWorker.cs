@@ -177,7 +177,12 @@ namespace AutoLog
                             .Union(type.Properties.Select(x => x.Name))
                             .Union(type.Methods.Select(x => x.Name))
                             .Union(type.GenericParameters.Select(x => x.Name));
-            return !memberNames.Contains(name);
+            var isValid = !memberNames.Contains(name);
+            if (type.BaseType != null)
+            {
+                return isValid && IsValidNewMemberName(type.BaseType.Resolve(), name);
+            }
+            else return isValid;
         }
         private static string DetermineLoggerFieldName(TypeDefinition type)
         {
