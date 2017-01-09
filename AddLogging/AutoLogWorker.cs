@@ -1,4 +1,5 @@
-﻿using Mono.Cecil;
+﻿//#define PARALLEL
+using Mono.Cecil;
 using Mono.Cecil.Cil;
 using NLog;
 using System;
@@ -48,25 +49,50 @@ namespace AutoLog
 
             // ------------------------------------------------------
             logger.Info($"Processing Module '{module.Name}'");
-            foreach (var type in module.Types.Where(x => x.Name == "BaseMvcPluginApplication"))
+
+            var types = module.Types.Where(x => !x.IsEnum);
+#if PARALLEL
+            Parallel.ForEach(module.Types, type =>
+#else
+            foreach (var type in module.Types)
+#endif
             {
                 logger.Info($"Processing Type '{type.Name}'");
 
                 var loggerField = AddStaticLoggerField(type, refs);
-                foreach (var method in type.Methods.Where(x => x.Name == "refreshPlugins"))
+#if PARALLEL
+                Parallel.ForEach(type.Methods, method =>
+#else
+                foreach (var method in type.Methods)
+#endif
                 {
                     logger.Info($"Processing Method '{method.Name}'");
                     if (method.Body == null)
+#if PARALLEL
+                        return;
+#else
                         continue;
-                    AddCatchLogger(loggerField, method, method.Body, refs);
+#endif
+                    //AddCatchLogger(loggerField, method, method.Body, refs);
                 }
+#if PARALLEL
+                );
+#endif
             }
-
+#if PARALLEL
+            );
+#endif
         }
 
         private static void AddCatchLogger(FieldDefinition loggerField, MethodDefinition method, MethodBody body, ModuleReferences refs)
         {
-            foreach (var exh in body.ExceptionHandlers.Where(x => x.HandlerType == ExceptionHandlerType.Catch))
+            var catches = body.ExceptionHandlers.Where(x => x.HandlerType == ExceptionHandlerType.Catch);
+#if PARALLEL
+            Parallel.ForEach(catches, exh =>
+#else
+            foreach (var exh in catches)
+#endif
+
             {
                 var hstart = exh.HandlerStart;
                 if (exh.CatchType.FullName == typeof(object).FullName)
@@ -100,6 +126,9 @@ namespace AutoLog
                 Instruction.Create(OpCodes.Callvirt, refs.LogError));
 
             }
+#if PARALLEL
+            );
+#endif
         }
         private static FieldDefinition AddStaticLoggerField(TypeDefinition type, ModuleReferences refs)
         {
