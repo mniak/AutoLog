@@ -69,11 +69,11 @@ namespace AutoLog
                     logger.Info($"Processing Method '{method.Name}'");
                     if (method.Body == null)
 #if PARALLEL
-                        return;
+                                        return;
 #else
                         continue;
 #endif
-                    //AddCatchLogger(loggerField, method, method.Body, refs);
+                    AddCatchLogger(loggerField, method, method.Body, refs);
                 }
 #if PARALLEL
                 );

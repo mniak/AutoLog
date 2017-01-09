@@ -1,4 +1,5 @@
-﻿using Mono.Cecil;
+﻿using AutoLog.Parse;
+using Mono.Cecil;
 using Mono.Cecil.Cil;
 using NLog;
 using System;
@@ -15,20 +16,9 @@ namespace AutoLog
     {
         static void Main(string[] args)
         {
-            //LogManager.DisableLogging();
-            //RodaExemplo();
-            RodaNaPastaInput();
-
-            //-----------------------
-            //Console.WriteLine();
-            //Console.WriteLine("--END--");
-            //Console.ReadLine();
-        }
-
-        private static void RodaNaPastaInput()
-        {
-            var di = new DirectoryInfo("Input");
-            var dlls = di.EnumerateFiles("Sda.*.dll").Skip(1).Take(1);
+            var parsed = ArgParser.Parse(args);
+            var di = new DirectoryInfo(Path.GetDirectoryName(parsed.Input));
+            var dlls = di.EnumerateFiles(Path.GetFileName(parsed.Input));
 #if PARALLEL
             Parallel.ForEach(dlls, dll =>
 #else
@@ -36,7 +26,7 @@ namespace AutoLog
 #endif
             {
                 using (var input = File.OpenRead(dll.FullName))
-                using (var output = File.OpenWrite(Path.Combine("Output", dll.Name)))
+                using (var output = File.OpenWrite(Path.Combine(parsed.Output, dll.Name)))
                 {
                     AutoLogWorker.AddLoggingToAssembly(input, output, dll.DirectoryName);
                 }
@@ -44,15 +34,23 @@ namespace AutoLog
 #if PARALLEL
             );
 #endif
+
+
+            //-----------------------
+            //Console.WriteLine();
+            //Console.WriteLine("--END--");
+            //Console.ReadLine();
         }
 
-        private static void RodaExemplo()
-        {
-            var input = @"..\..\..\ProgramaTeste\bin\debug\ProgramaTeste.exe";
-            var output = "Patched.exe";
-            AutoLogWorker.AddLoggingToAssembly(input, output);
-            Process.Start(output);
-        }
+
+
+        //private static void RodaExemplo()
+        //{
+        //    var input = @"..\..\..\ProgramaTeste\bin\debug\ProgramaTeste.exe";
+        //    var output = "Patched.exe";
+        //    AutoLogWorker.AddLoggingToAssembly(input, output);
+        //    Process.Start(output);
+        //}
 
     }
 }

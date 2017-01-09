@@ -72,7 +72,10 @@
   <ItemGroup>
     <Compile Include="AutoLogWorker.cs" />
     <Compile Include="InstructionHelper.cs" />
+    <Compile Include="Parse\LexResult.cs" />
+    <Compile Include="Parse\ArgParser.cs" />
     <Compile Include="ModuleReferences.cs" />
+    <Compile Include="Parse\ParseResult.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
