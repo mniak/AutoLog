@@ -135,9 +135,20 @@ namespace AutoLog
             var loggerField = new FieldDefinition(DetermineLoggerFieldName(type), FieldAttributes.Private | FieldAttributes.Static | FieldAttributes.InitOnly, refs.Ilogger);
             type.Fields.Add(loggerField);
 
+            FieldReference refLoggerField = loggerField;
+            if (type.HasGenericParameters)
+            {
+                var declaringType = new GenericInstanceType(loggerField.DeclaringType);
+                foreach (var parameter in loggerField.DeclaringType.GenericParameters)
+                {
+                    declaringType.GenericArguments.Add(parameter);
+                }
+                refLoggerField = new FieldReference(loggerField.Name, loggerField.FieldType, declaringType);
+            }
+
             var initr = new[] {
                 Instruction.Create(OpCodes.Call, refs.GetCurrentClassLogger),
-                Instruction.Create(OpCodes.Stsfld, loggerField),
+                Instruction.Create(OpCodes.Stsfld, refLoggerField),
             };
 
             var cctor = type.Methods.SingleOrDefault(x => x.Name == ".cctor");
