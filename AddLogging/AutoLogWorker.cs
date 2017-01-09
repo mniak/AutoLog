@@ -69,7 +69,7 @@ namespace AutoLog
                     logger.Info($"Processing Method '{method.Name}'");
                     if (method.Body == null)
 #if PARALLEL
-                                        return;
+                        return;
 #else
                         continue;
 #endif
