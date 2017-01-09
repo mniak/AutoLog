@@ -52,9 +52,9 @@ namespace AutoLog
 
             var types = module.Types.Where(x => !x.IsEnum);
 #if PARALLEL
-            Parallel.ForEach(module.Types, type =>
+            Parallel.ForEach(types, type =>
 #else
-            foreach (var type in module.Types)
+            foreach (var type in types)
 #endif
             {
                 logger.Info($"Processing Type '{type.Name}'");
