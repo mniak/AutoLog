@@ -1,5 +1,4 @@
-﻿//#define PARALLEL
-using Mono.Cecil;
+﻿using Mono.Cecil;
 using Mono.Cecil.Cil;
 using NLog;
 using System;
@@ -11,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace AutoLog
 {
-    public static class AutoLogWorker
+    public static class AutoLogProcessor
     {
         const string PREFERRABLE_LOGGER_FIELD_NAME = "logger";
         private static ILogger logger = LogManager.GetCurrentClassLogger();
@@ -36,12 +35,12 @@ namespace AutoLog
             var asm = AssemblyDefinition.ReadAssembly(input, @params);
             var module = asm.MainModule;
 
-            ProcessModule(module);
-
+            ProcessModule(module, t => t.FullName == "Sda.Accounts.Services.AccountService", m => m.Name == "SaveJoinedUser");
+            logger.Info($"Saving Assembly {asm.Name}");
             asm.Write(output);
         }
 
-        private static void ProcessModule(ModuleDefinition module)
+        private static void ProcessModule(ModuleDefinition module, Func<TypeDefinition, bool> typeFilter = null, Func<MethodDefinition, bool> methodFilter = null)
         {
             logger.Info($"Processing Module '{module.Name}'");
 
@@ -51,48 +50,72 @@ namespace AutoLog
             logger.Info($"Processing Module '{module.Name}'");
 
             var types = module.Types.Where(x => !x.IsEnum);
-#if PARALLEL
-            Parallel.ForEach(types, type =>
-#else
+            if (typeFilter != null)
+                types = types.Where(typeFilter);
+
             foreach (var type in types)
-#endif
             {
                 logger.Info($"Processing Type '{type.Name}'");
 
                 var loggerField = AddStaticLoggerField(type, refs);
-#if PARALLEL
-                Parallel.ForEach(type.Methods, method =>
-#else
-                foreach (var method in type.Methods)
-#endif
+                IEnumerable<MethodDefinition> methods = type.Methods;
+                if (methodFilter != null)
+                    methods = methods.Where(methodFilter);
+                foreach (var method in methods)
                 {
-                    logger.Info($"Processing Method '{method.Name}'");
-                    if (method.Body == null)
-#if PARALLEL
-                        return;
-#else
-                        continue;
-#endif
-                    AddCatchLogger(loggerField, method, method.Body, refs);
+                    ProcessMethod(refs, method, loggerField);
                 }
-#if PARALLEL
-                );
-#endif
             }
-#if PARALLEL
-            );
-#endif
         }
 
-        private static void AddCatchLogger(FieldDefinition loggerField, MethodDefinition method, MethodBody body, ModuleReferences refs)
+        private static void ProcessMethod(ModuleReferences refs, MethodDefinition method, FieldDefinition loggerField)
         {
-            var catches = body.ExceptionHandlers.Where(x => x.HandlerType == ExceptionHandlerType.Catch);
-#if PARALLEL
-            Parallel.ForEach(catches, exh =>
-#else
-            foreach (var exh in catches)
-#endif
+            logger.Info($"Processing Method '{method.Name}'");
+            if (method.Body == null)
+                return;
+            int shift = AddCatchLogger(refs, method, loggerField);
+            ReplaceShortInstructions(method);
+        }
 
+        private static void ReplaceShortInstructions(MethodDefinition method)
+        {
+            var convDict = new Dictionary<OpCode, OpCode>() {
+                {OpCodes.Br_S       , OpCodes.Br       },
+                {OpCodes.Brfalse_S  , OpCodes.Brfalse  },
+                {OpCodes.Brtrue_S   , OpCodes.Brtrue   },
+                {OpCodes.Beq_S      , OpCodes.Beq      },
+                {OpCodes.Bge_S      , OpCodes.Bge      },
+                {OpCodes.Bgt_S      , OpCodes.Bgt      },
+                {OpCodes.Ble_S      , OpCodes.Ble      },
+                {OpCodes.Blt_S      , OpCodes.Blt      },
+                {OpCodes.Bne_Un_S   , OpCodes.Bne_Un   },
+                {OpCodes.Bge_Un_S   , OpCodes.Bge_Un   },
+                {OpCodes.Bgt_Un_S   , OpCodes.Bgt_Un   },
+                {OpCodes.Ble_Un_S   , OpCodes.Ble_Un   },
+                {OpCodes.Blt_Un_S   , OpCodes.Blt_Un   },
+                {OpCodes.Leave_S    , OpCodes.Leave    },
+            };
+            foreach (var ins in method.Body.Instructions)
+            {
+                if (ins.OpCode.OperandType == OperandType.ShortInlineBrTarget && ins.Operand is Instruction)
+                {
+                    var target = ins.Operand as Instruction;
+                    var dif = target.Offset - ins.Offset;
+                    //if (dif + shift > byte.MaxValue && convDict.ContainsKey(ins.OpCode))
+                    {
+                        var newOpCode = convDict[ins.OpCode];
+                        ins.OpCode = newOpCode;
+                    }
+                }
+            }
+        }
+
+        private static int AddCatchLogger(ModuleReferences refs, MethodDefinition method, FieldDefinition loggerField)
+        {
+            var body = method.Body;
+            var catches = body.ExceptionHandlers.Where(x => x.HandlerType == ExceptionHandlerType.Catch);
+            int result = 0;
+            foreach (var exh in catches)
             {
                 var hstart = exh.HandlerStart;
                 if (exh.CatchType.FullName == typeof(object).FullName)
@@ -114,21 +137,22 @@ namespace AutoLog
                 {
                     slot = InstructionHelper.GetSlot(hstart);
                 }
-
-                il.InjectAfter(hstart,
+                var instructions = new[] {
                     Instruction.Create(OpCodes.Ldsfld, loggerField),
                     InstructionHelper.CreateLdloc(method, slot),
                     Instruction.Create(OpCodes.Ldstr, "AUTOLOG EXCEPTION"),
-#if NLOG_LT_4311
+                    #if NLOG_LT_4311
                     Instruction.Create(OpCodes.Ldc_I4_0),
                     Instruction.Create(OpCodes.Newarr, refs.Object),
-#endif
-                Instruction.Create(OpCodes.Callvirt, refs.LogError));
+                    #endif
+                    Instruction.Create(OpCodes.Callvirt, refs.LogError),
+                };
+                il.Body.MaxStackSize += 10;
+                il.InjectAfter(hstart, instructions);
 
+                result += instructions.Sum(x => x.GetSize());
             }
-#if PARALLEL
-            );
-#endif
+            return result;
         }
         private static FieldDefinition AddStaticLoggerField(TypeDefinition type, ModuleReferences refs)
         {

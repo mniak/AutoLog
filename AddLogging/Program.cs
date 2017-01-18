@@ -28,7 +28,7 @@ namespace AutoLog
                 using (var input = File.OpenRead(dll.FullName))
                 using (var output = File.OpenWrite(Path.Combine(parsed.Output, dll.Name)))
                 {
-                    AutoLogWorker.AddLoggingToAssembly(input, output, dll.DirectoryName);
+                    AutoLogProcessor.AddLoggingToAssembly(input, output, dll.DirectoryName);
                 }
             }
 #if PARALLEL

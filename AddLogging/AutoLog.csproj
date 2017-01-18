@@ -70,7 +70,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AutoLogWorker.cs" />
+    <Compile Include="AutoLogProcessor.cs" />
     <Compile Include="InstructionHelper.cs" />
     <Compile Include="Parse\LexResult.cs" />
     <Compile Include="Parse\ArgParser.cs" />
