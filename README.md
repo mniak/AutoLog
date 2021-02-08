@@ -1,4 +1,4 @@
-# AutoLog
+AutoLog
 ==============
 
 Adds exception logging to compiled `.dll` files.
